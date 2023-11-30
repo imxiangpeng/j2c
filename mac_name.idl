@@ -1,0 +1,5 @@
+
+interface mac_tbl {
+  string mac;
+  string name;
+};

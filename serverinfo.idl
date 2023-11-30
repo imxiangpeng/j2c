@@ -1,0 +1,11 @@
+
+interface serverinfo {
+  int int_val;
+  string bssaddr;
+  string abiaddr;
+  string devtoken;
+  string devid;
+  Array backup;
+  Array macs;
+  double double_val;
+};

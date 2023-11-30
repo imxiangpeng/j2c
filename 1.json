@@ -1,0 +1,10 @@
+{
+  "int_val": 128,
+   "bssaddr":"http://xxxx.com",
+   "abiaddr":"ip:port",
+   "devtoken":"devtokexxxxxxxxxxxyyyyyyyyyyyyyyyyyiiiiiiiiiiiiiiiiiiiiiiixzxxxxxxxxxxx",
+   "devid":"devid12345678",
+   "backup":["backup1", "backup2"],
+   "macs":[{"mac":"5C:23:34:45:56", "name": "pc"}, {"mac":"5E:23:34:45:56", "name": "pc2"}],
+  "double_val": 128.23
+}
