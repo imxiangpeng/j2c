@@ -17,21 +17,19 @@
 // create not support none name element
 // array string/int, such as [ 1, 2 ] or  ["xxx", "yyy"]
 
-
 #ifndef TEMP_FAILURE_RETRY
-    #define TEMP_FAILURE_RETRY(exp)                                                \
-  ({                                                                           \
-    typeof(exp) _rc;                                                           \
-    do {                                                                       \
-      _rc = (exp);                                                             \
-    } while (_rc == -1 && errno == EINTR);                                     \
-    _rc;                                                                       \
-  })
+#define TEMP_FAILURE_RETRY(exp)                \
+    ({                                         \
+        typeof(exp) _rc;                       \
+        do {                                   \
+            _rc = (exp);                       \
+        } while (_rc == -1 && errno == EINTR); \
+        _rc;                                   \
+    })
 #endif
 // you must free the pointer
 static size_t _read_file(const char *path, char **buf) {
     int fd = -1;
-    size_t length = 0;
     struct stat sb;
     char *data = NULL, *ptr = NULL;
     if (lstat(path, &sb) != 0 || sb.st_size == 0 || !buf) {
@@ -95,28 +93,27 @@ static size_t _write_file(const char *path, char *data, size_t size) {
     return size;
 }
 
-struct j2cobject* j2cobject_create(enum j2ctype type, size_t size) {
+struct j2cobject *j2cobject_create(enum j2ctype type, size_t size) {
     struct j2cobject *object = (struct j2cobject *)calloc(1, size);
 
     switch (type) {
-    case J2C_OBJECT:
-        J2COBJECT(object)->type = type;
-        J2COBJECT(object)->name = "object";
-        break;
-    case J2C_ARRAY:
-        J2COBJECT(object)->type = type;
-        J2COBJECT(object)->name = "array";
-        break;
+        case J2C_OBJECT:
+            J2COBJECT(object)->type = type;
+            J2COBJECT(object)->name = "object";
+            break;
+        case J2C_ARRAY:
+            J2COBJECT(object)->type = type;
+            J2COBJECT(object)->name = "array";
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
 
     return object;
 }
 
 void j2cobject_free(struct j2cobject *self) {
-
     if (!self) {
         return;
     }
@@ -136,21 +133,22 @@ void j2cobject_free(struct j2cobject *self) {
 
         for (; pt->name != NULL; pt++) {
             switch (pt->type) {
-            case J2C_STRING:
-                {
-                    char *ptr = *(char **)((char *)self + pt->offset);
-                    free(ptr);
+                case J2C_STRING: {
+                    // we force using char[], should do not need free here
+                    if (pt->offset_len == 0) {  // char*
+                        char *ptr = *(char **)((char *)self + pt->offset);
+                        free(ptr);
+                    }
                     break;
                 }
-            case J2C_ARRAY:
-            case J2C_OBJECT:
-                {
+                case J2C_ARRAY:
+                case J2C_OBJECT: {
                     struct j2cobject *ptr = *(struct j2cobject **)((char *)self + pt->offset);
                     j2cobject_free(ptr);
                     break;
                 }
-            default:
-                break;
+                default:
+                    break;
             }
         }
     }
@@ -158,7 +156,7 @@ void j2cobject_free(struct j2cobject *self) {
     free(self);
     return;
 }
-static const struct j2cobject_prototype*
+static const struct j2cobject_prototype *
 j2cobject_field_prototype(struct j2cobject *self, const char *field) {
     const struct j2cobject_prototype *pt = NULL;
 
@@ -196,8 +194,7 @@ static int j2cobject_from_jobject(cJSON *jobj, struct j2cobject *cobj) {
         }
 
         switch (ele->type) {
-        case cJSON_Number:
-            {
+            case cJSON_Number: {
                 if (pt->type == J2C_INT) {
                     int *ptr = (int *)((char *)cobj + pt->offset);
                     *ptr = (int)cJSON_GetNumberValue(ele);
@@ -208,23 +205,24 @@ static int j2cobject_from_jobject(cJSON *jobj, struct j2cobject *cobj) {
 
                 break;
             }
-        case cJSON_String:
-            {
+            case cJSON_String: {
                 // do not free cJSON_Print memory, it willed be freed when object is deallocate
-                char **ptr = (char **)((char *)cobj + pt->offset);
-                *ptr = strdup(cJSON_GetStringValue(ele));
+                if (pt->offset_len == 0) {  // char *
+                    char **ptr = (char **)((char *)cobj + pt->offset);
+                    *ptr = strdup(cJSON_GetStringValue(ele));
+                } else {  // char[]
+                    char *ptr = (char *)((char *)cobj + pt->offset);
+                    snprintf(ptr, pt->offset_len, "%s", cJSON_GetStringValue(ele));
+                }
                 break;
             }
-        case cJSON_Object:
-            {
+            case cJSON_Object: {
                 // do not free cJSON_Print memory, it willed be freed when object is deallocate
                 char **ptr = (char **)((char *)cobj + pt->offset);
                 char *str = cJSON_Print(ele);
                 *ptr = str;
-            }
-            break;
-        case cJSON_Array:
-            {
+            } break;
+            case cJSON_Array: {
                 // do not free cJSON_Print memory, it willed be freed when object is deallocate
                 struct j2cobject **ptr = (struct j2cobject **)((char *)cobj + pt->offset);
 
@@ -232,11 +230,10 @@ static int j2cobject_from_jobject(cJSON *jobj, struct j2cobject *cobj) {
                 arr->size = cJSON_GetArraySize(ele);
                 arr->priv_data = (void *)cJSON_Duplicate(ele, 1);
                 *ptr = J2COBJECT(arr);
-            }
-            break;
+            } break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 
@@ -291,7 +288,6 @@ int j2cobject_from_file(const char *path, struct j2cobject *cobj) {
     return ret;
 }
 
-
 int j2cobject_write_file(struct j2cobject *self, const char *path) {
     char *data = NULL;
     if (!self || !path) {
@@ -311,13 +307,11 @@ int j2cobject_write_file(struct j2cobject *self, const char *path) {
 
     return 0;
 }
-struct j2cobject* j2cobject_to_list(struct j2cobject *object, j2cobject_allocate_handler allocater) {
-
+struct j2cobject *j2cobject_to_list(struct j2cobject *object, j2cobject_allocate_handler allocater) {
     struct j2cobject *head = NULL;
-    int size = object->size;
+    // int size = object->size;
     cJSON *json = NULL;
     cJSON *ele = NULL;
-
 
     if (!object || !allocater) {
         return NULL;
@@ -326,7 +320,6 @@ struct j2cobject* j2cobject_to_list(struct j2cobject *object, j2cobject_allocate
     if (object->type != J2C_ARRAY) {
         return NULL;
     }
-
 
     if (object->priv_data) {
         json = (cJSON *)object->priv_data;
@@ -340,7 +333,7 @@ struct j2cobject* j2cobject_to_list(struct j2cobject *object, j2cobject_allocate
 
     cJSON_ArrayForEach(ele, json) {
         struct j2cobject *subobj = NULL;
-        const struct j2cobject_prototype *pt = NULL;
+        // const struct j2cobject_prototype *pt = NULL;
         if (!ele || !cJSON_IsObject(ele)) continue;
 
         // array string/int, such as [ 1, 2 ] or  ["xxx", "yyy"]
@@ -364,7 +357,7 @@ struct j2cobject* j2cobject_to_list(struct j2cobject *object, j2cobject_allocate
 }
 
 // please free the memory
-char* j2cobject_serializer(struct j2cobject *self) {
+char *j2cobject_serializer(struct j2cobject *self) {
     char *data = NULL;
     const struct j2cobject_prototype *pt = NULL;
 
@@ -376,23 +369,27 @@ char* j2cobject_serializer(struct j2cobject *self) {
     pt = self->prototype;
 
     for (; pt->name != NULL; pt++) {
+        // char* -> char**
+        // char [] -> char*
         char **ptr = (char **)((char *)self + pt->offset);
         switch (pt->type) {
-        case J2C_INT:
-            {
+            case J2C_INT: {
                 int num = *(int *)((char *)self + pt->offset);
                 cJSON_AddNumberToObject(root, pt->name, num);
                 break;
             }
-        case J2C_DOUBLE:
-            {
+            case J2C_DOUBLE: {
                 double num = *(double *)((char *)self + pt->offset);
                 cJSON_AddNumberToObject(root, pt->name, num);
                 break;
             }
-        case J2C_STRING:
-            {
-                char *str = *ptr;
+            case J2C_STRING: {
+                char *str = NULL;
+                if (pt->offset_len == 0) {  // char*
+                    str = *ptr;
+                } else {  // char[]
+                    str = ((char *)self + pt->offset);
+                }
                 cJSON *ele = cJSON_AddStringToObject(root, pt->name, str);
                 if (!ele) {
                     // failed we should release
@@ -401,9 +398,8 @@ char* j2cobject_serializer(struct j2cobject *self) {
                 }
                 break;
             }
-        case J2C_ARRAY:
-        case J2C_OBJECT:
-            {
+            case J2C_ARRAY:
+            case J2C_OBJECT: {
                 struct j2cobject *object = (struct j2cobject *)*ptr;
                 if (!object) {
                     // using empty object/array, do not return error
@@ -432,7 +428,6 @@ char* j2cobject_serializer(struct j2cobject *self) {
                 }
                 break;
             }
-
         }
     }
 
@@ -441,4 +436,56 @@ char* j2cobject_serializer(struct j2cobject *self) {
     cJSON_Delete(root);
 
     return data;
+}
+
+// only support basic data type
+int j2cobject_serializer_to_cjson(struct j2cobject *self, struct cJSON *target) {
+    cJSON *root = target;
+
+    if (!self || !self->prototype || !root) {
+        return -1;
+    }
+
+    const struct j2cobject_prototype *pt = NULL;
+    pt = self->prototype;
+
+    for (; pt->name != NULL; pt++) {
+        switch (pt->type) {
+            case J2C_INT: {
+                int num = *(int *)((char *)self + pt->offset);
+                cJSON_AddNumberToObject(root, pt->name, num);
+                break;
+            }
+            case J2C_DOUBLE: {
+                double num = *(double *)((char *)self + pt->offset);
+                cJSON_AddNumberToObject(root, pt->name, num);
+                break;
+            }
+            case J2C_STRING: {
+                // char* -> char**
+                // char [] -> char*
+                char *str = NULL;
+                if (pt->offset_len == 0) {  // char*
+                    char **ptr = (char **)((char *)self + pt->offset);
+                    str = *ptr;
+                } else {  // char[]
+                    str = ((char *)self + pt->offset);
+                }
+
+                cJSON *ele = cJSON_AddStringToObject(root, pt->name, str);
+                if (!ele) {
+                    // failed we should release
+                    return -1;
+                }
+                break;
+            }
+            case J2C_ARRAY:
+            case J2C_OBJECT:
+            default:
+                printf("not support object or array data !\n");
+                return -1;
+        }
+    }
+
+    return 0;
 }
