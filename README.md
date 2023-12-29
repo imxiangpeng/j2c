@@ -37,14 +37,22 @@ static struct j2cobject_prototype hrobject_ip_prototype[] = {
 };
 
 struct j2cobject *hrobject_ip_allocate() {
-
-    return NULL;
-}
-int hrobject_ip_init(struct j2cobject *obj) {
+    struct j2cobject *obj = j2cobject_create(J2C_OBJECT, sizeof(hrobject_ip));
+    if (!obj)
+        return NULL;
     obj->name = "ip";
     obj->prototype = hrobject_ip_prototype;
-
-    memset((void*)(obj+1), 0, sizeof(hrobject_ip) - sizeof(struct j2cobject));
+    return obj;
+}
+int hrobject_ip_setup(struct j2cobject *obj) {
+    obj->name = "ip";
+    obj->prototype = hrobject_ip_prototype;
+    
+    printf("%s(%d): object :%p\n", __FUNCTION__, __LINE__, obj);
+    // should not clear memory, only setup prototype
+    // 这里不允许清空后面内存，因为会导致数据丢失，我们仅仅安装 prototype
+    //memset((void*)(obj+1), 0, sizeof(hrobject_ip) - sizeof(struct j2cobject));
+    printf("%s(%d): object :%p, proto:%p\n", __FUNCTION__, __LINE__, obj, obj->prototype);
 
     return 0;
 }
@@ -53,7 +61,6 @@ int hrobject_ip_deallocate(struct j2cobject *obj) {
     
     return 0;
 }
-
 
 static struct j2cobject_prototype hrobject_wan_prototype[] = {
     {.name = "index",             .type = J2C_INT,       .offset = _J2COBJECT_WAN_DATA_OFFSET(index),             .offset_len = 0},

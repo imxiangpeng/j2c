@@ -215,10 +215,19 @@ static int j2cobject_from_jobject(cJSON *jobj, struct j2cobject *cobj) {
                 break;
             }
             case cJSON_Object: {
-                // do not free cJSON_Print memory, it willed be freed when object is deallocate
-                char **ptr = (char **)((char *)cobj + pt->offset);
-                char *str = cJSON_Print(ele);
-                *ptr = str;
+                // pt->offset_len 0: -> pointer
+                //              > 0: -> struct data
+                struct j2cobject *child = NULL;
+                if (pt->offset_len == 0) {
+                    struct j2cobject **ptr = (struct j2cobject **)((char *)cobj + pt->offset);
+                    child = pt->ctor();
+                    *ptr = child;
+                } else {
+                    child = (struct j2cobject *)((char *)cobj + pt->offset);
+                    // must call init to setup prototype
+                    pt->init(child);
+                }
+                j2cobject_from_jobject(ele, child);
             } break;
             case cJSON_Array: {
                 // do not free cJSON_Print memory, it willed be freed when object is deallocate
@@ -399,8 +408,7 @@ int j2cobject_serializer_to_cjson(struct j2cobject *self, struct cJSON *target) 
                 // char [] -> char*
                 char *str = NULL;
                 if (pt->offset_len == 0) {  // char*
-                    char **ptr = (char **)((char *)self + pt->offset);
-                    str = *ptr;
+                    str = *(char **)((char *)self + pt->offset);
                 } else {  // char[]
                     str = ((char *)self + pt->offset);
                 }
@@ -415,17 +423,14 @@ int j2cobject_serializer_to_cjson(struct j2cobject *self, struct cJSON *target) 
             case J2C_OBJECT: {
                 struct j2cobject *object = NULL;
 
+                cJSON *child = cJSON_AddObjectToObject(root, pt->name);
                 if (pt->offset_len == 0) {
-                    char **ptr = (char **)((char *)self + pt->offset);
-                    object = (struct j2cobject *)*ptr;
-                    cJSON *child = cJSON_AddObjectToObject(root, pt->name);
-                    j2cobject_serializer_to_cjson(object, child);
+                    object = *(struct j2cobject **)((char *)self + pt->offset);
                 } else {
                     object = (struct j2cobject *)((char *)self + pt->offset);
                     pt->init(object);
-                    cJSON *child = cJSON_AddObjectToObject(root, pt->name);
-                    j2cobject_serializer_to_cjson(object, child);
                 }
+                j2cobject_serializer_to_cjson(object, child);
 
                 break;
             }
