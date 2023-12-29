@@ -1,16 +1,14 @@
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "j2cobject.h"
 
 #include <errno.h>
-
-#include "j2cobject.h"
+#include <fcntl.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "cjson/cJSON.h"
 
@@ -359,78 +357,13 @@ struct j2cobject *j2cobject_to_list(struct j2cobject *object, j2cobject_allocate
 // please free the memory
 char *j2cobject_serializer(struct j2cobject *self) {
     char *data = NULL;
-    const struct j2cobject_prototype *pt = NULL;
 
     if (!self || !self->prototype) {
         return NULL;
     }
 
     cJSON *root = cJSON_CreateObject();
-    pt = self->prototype;
-
-    for (; pt->name != NULL; pt++) {
-        // char* -> char**
-        // char [] -> char*
-        char **ptr = (char **)((char *)self + pt->offset);
-        switch (pt->type) {
-            case J2C_INT: {
-                int num = *(int *)((char *)self + pt->offset);
-                cJSON_AddNumberToObject(root, pt->name, num);
-                break;
-            }
-            case J2C_DOUBLE: {
-                double num = *(double *)((char *)self + pt->offset);
-                cJSON_AddNumberToObject(root, pt->name, num);
-                break;
-            }
-            case J2C_STRING: {
-                char *str = NULL;
-                if (pt->offset_len == 0) {  // char*
-                    str = *ptr;
-                } else {  // char[]
-                    str = ((char *)self + pt->offset);
-                }
-                cJSON *ele = cJSON_AddStringToObject(root, pt->name, str);
-                if (!ele) {
-                    // failed we should release
-                    cJSON_Delete(root);
-                    return NULL;
-                }
-                break;
-            }
-            case J2C_ARRAY:
-            case J2C_OBJECT: {
-                struct j2cobject *object = (struct j2cobject *)*ptr;
-                if (!object) {
-                    // using empty object/array, do not return error
-                    if (pt->type == J2C_OBJECT) {
-                        cJSON_AddObjectToObject(root, pt->name);
-                    } else {
-                        cJSON_AddArrayToObject(root, pt->name);
-                    }
-                    continue;
-                }
-
-                if (object->priv_data) {
-                    cJSON *o = (cJSON *)object->priv_data;
-                    cJSON_AddItemToObject(root, pt->name, cJSON_Duplicate(o, 1));
-                } else if (object->raw_data) {
-                    // fallback using raw data method
-                    // so user can create array object and fill raw_data
-                    // no need call cJSON_Delete(o), because it has been added into root
-                    cJSON *o = cJSON_Parse(object->raw_data);
-                    if (o) {
-                        if (!cJSON_AddItemToObject(root, pt->name, o)) {
-                            // delete it when it's not added into root
-                            cJSON_Delete(o);
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    }
-
+    j2cobject_serializer_to_cjson(self, root);
     // should be freed manual ...
     data = cJSON_Print(root);
     cJSON_Delete(root);
@@ -479,8 +412,26 @@ int j2cobject_serializer_to_cjson(struct j2cobject *self, struct cJSON *target) 
                 }
                 break;
             }
-            case J2C_ARRAY:
-            case J2C_OBJECT:
+            case J2C_OBJECT: {
+                struct j2cobject *object = NULL;
+
+                if (pt->offset_len == 0) {
+                    char **ptr = (char **)((char *)self + pt->offset);
+                    object = (struct j2cobject *)*ptr;
+                    cJSON *child = cJSON_AddObjectToObject(root, pt->name);
+                    j2cobject_serializer_to_cjson(object, child);
+                } else {
+                    object = (struct j2cobject *)((char *)self + pt->offset);
+                    pt->init(object);
+                    cJSON *child = cJSON_AddObjectToObject(root, pt->name);
+                    j2cobject_serializer_to_cjson(object, child);
+                }
+
+                break;
+            }
+            case J2C_ARRAY: {
+                break;
+            }
             default:
                 printf("not support object or array data !\n");
                 return -1;

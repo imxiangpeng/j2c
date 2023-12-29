@@ -20,6 +20,8 @@
 #define J2COBJECT(self) ((struct j2cobject*)self)
 #define J2COBJECT_PROTOTYPE(self) J2COBJECT(self)->prototype
 
+struct cJSON;
+
 enum j2ctype {
     J2C_UNKNOWN = 0,
     J2C_INT,
@@ -34,7 +36,13 @@ struct j2cobject_prototype {
     int type;
     size_t offset;
     size_t offset_len;
-    //any_val def_val;
+    // only used when it's object not normal basic type such int/string/...
+    // so we can create new dynamic object
+    struct j2cobject* (*ctor)();
+    // when offset_len > 0 it means that it's not pointer, data have been allocated
+    // you should directly setup proto and other fields
+    int (*init)(struct j2cobject *);
+    int (*dtor)(struct j2cobject *);
 };
 
 struct j2cobject {
@@ -65,6 +73,8 @@ int j2cobject_write_file(struct j2cobject *self, const char *path);
 struct j2cobject* j2cobject_to_list(struct j2cobject *object, j2cobject_allocate_handler allocater);
 // must be freed manually
 char* j2cobject_serializer(struct j2cobject *self);
+int j2cobject_serializer_to_cjson(struct j2cobject *self, struct cJSON *target);
+
 
 int j2cobject_write_file(struct j2cobject *self, const char *path);
 
