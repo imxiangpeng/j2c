@@ -139,12 +139,14 @@ void j2cobject_free(struct j2cobject *self) {
                     }
                     break;
                 }
-                case J2C_ARRAY:
                 case J2C_OBJECT: {
-                    struct j2cobject *ptr = *(struct j2cobject **)((char *)self + pt->offset);
-                    j2cobject_free(ptr);
+                    if (pt->offset_len == 0) {
+                        struct j2cobject *ptr = *(struct j2cobject **)((char *)self + pt->offset);
+                        j2cobject_free(ptr);
+                    }
                     break;
                 }
+                case J2C_ARRAY:
                 default:
                     break;
             }
