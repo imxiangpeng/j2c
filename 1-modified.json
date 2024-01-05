@@ -1,0 +1,22 @@
+{
+	"index":	1,
+	"name":	"1_INTERNET_R_VID_",
+	"workmode":	0,
+	"v4_proto":	2,
+	"device":	{
+		"name":	"wan_name",
+		"mac":	"08:10:74:00:00:01",
+		"mtu":	1500,
+		"v4":	{
+			"address":	"192.168.58.101",
+			"gateway":	"192.168.58.1",
+			"netmask":	"255.255.255.0",
+			"dns":	"10.100.1.58",
+			"dns2":	"10.100.1.24"
+		}
+	},
+	"pppoe":	{
+		"username":	"myname",
+		"password":	"mypassword"
+	}
+}

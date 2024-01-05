@@ -1,9 +1,11 @@
 
 
-gcc j2c.c j2cobject.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2c
+gcc j2s.c j2sobject.c hrserver_object.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2s
+
+
 # 查看运行结果
-./j2c
-valgrind --leak-check=full ./j2c
+./j2s
+valgrind --leak-check=full ./j2s
 
 
 
