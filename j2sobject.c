@@ -158,7 +158,7 @@ struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
 }
 void j2sobject_free(struct j2sobject *self) {
     const struct j2sobject_fields_prototype *pt = NULL;
-    if (!self || !self->proto || !self->proto->dtor) {
+    if (!self || !self->proto || !self->field_protos) {
         return;
     }
 
@@ -194,7 +194,8 @@ void j2sobject_free(struct j2sobject *self) {
                     object = (struct j2sobject *)((char *)self + pt->offset);
                     // care that if object contains char* memory(which maybe allocated in deserialize),
                     // you should release it, because we can not call j2sobject_free here
-                    pt->proto->dtor(object);
+                    if (pt->proto->dtor)
+                        pt->proto->dtor(object);
                 }
                 break;
             }
@@ -206,7 +207,8 @@ void j2sobject_free(struct j2sobject *self) {
         }
     }
 
-    self->proto->dtor(self);
+    if (self->proto->dtor)
+        self->proto->dtor(self);
 
     free(self);
 }
