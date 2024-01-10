@@ -37,7 +37,6 @@ static size_t _read_file(const char *path, char **buf) {
 
     fd = open(path, O_RDONLY);
     if (fd < 0) {
-    printf("open failed:%s, error:%s\n", path, strerror(errno));
         return -1;
     }
 
@@ -84,12 +83,13 @@ static size_t _write_file(const char *path, char *data, size_t size) {
     while (left > 0) {
         ssize_t n = TEMP_FAILURE_RETRY(write(fd, ptr, left));
         if (n == -1) {
+            close(fd);
             return size - left;
         }
         ptr += n;
         left -= n;
     }
-    
+
     close(fd);
 
     return size;
@@ -149,7 +149,7 @@ struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
     self = (struct j2sobject *)calloc(1, proto->size);
 
     proto->ctor(self);
-    
+
     // setup object proto only when construct not do
     if (!self->proto)
         self->proto = proto;
@@ -157,10 +157,52 @@ struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
     return self;
 }
 void j2sobject_free(struct j2sobject *self) {
+    const struct j2sobject_fields_prototype *pt = NULL;
     if (!self || !self->proto || !self->proto->dtor) {
         return;
     }
-    
+
+    // should release all elements
+    pt = self->field_protos;
+
+    for (; pt->name != NULL; pt++) {
+        switch (pt->type) {
+            case J2S_STRING: {
+                // char* -> char**
+                // char [] -> char*
+                char *str = NULL;
+                if (pt->offset_len == 0) {  // char*
+                    str = *(char **)((char *)self + pt->offset);
+                    if (str) {
+                        free(str);
+                    }
+                }
+
+                break;
+            }
+            case J2S_OBJECT: {
+                struct j2sobject *object = NULL;
+                // pt->offset_len 0: -> pointer
+                //              > 0: -> struct data
+                if (pt->offset_len == 0) {
+                    object = *(struct j2sobject **)((char *)self + pt->offset);
+                    j2sobject_free(object);
+                } else {
+                    object = (struct j2sobject *)((char *)self + pt->offset);
+                    // care that if object contains char* memory(which maybe allocated in deserialize),
+                    // you should release it, because we can not call j2sobject_free here
+                    pt->proto->dtor(object);
+                }
+                break;
+            }
+            case J2S_ARRAY: {
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
     self->proto->dtor(self);
 
     free(self);
@@ -169,53 +211,10 @@ void j2sobject_free(struct j2sobject *self) {
 int j2sobject_reset(struct j2sobject *self) {
     if (!self || !self->proto) return -1;
 
-    memset((void*)((char*)self + sizeof(struct j2sobject)), 0, self->proto->size - sizeof(struct j2sobject));
+    memset((void *)((char *)self + sizeof(struct j2sobject)), 0, self->proto->size - sizeof(struct j2sobject));
 
     return 0;
 }
-#if 0
-void j2sobject_free(struct j2sobject *self) {
-    if (!self) {
-        return;
-    }
-
-    if (self->priv_data) {
-        cJSON *obj = (cJSON *)self->priv_data;
-        obj->type &= ~cJSON_IsReference;
-        cJSON_Delete(obj);
-        self->priv_data = NULL;
-    }
-    if (self->proto) {
-        const struct j2sobject_fields_prototype *pt = self->proto;
-
-        for (; pt->name != NULL; pt++) {
-            switch (pt->type) {
-                case J2S_STRING: {
-                    // we force using char[], should do not need free here
-                    if (pt->offset_len == 0) {  // char*
-                        char *ptr = *(char **)((char *)self + pt->offset);
-                        free(ptr);
-                    }
-                    break;
-                }
-                case J2S_OBJECT: {
-                    if (pt->offset_len == 0) {
-                        struct j2sobject *ptr = *(struct j2sobject **)((char *)self + pt->offset);
-                        j2sobject_free(ptr);
-                    }
-                    break;
-                }
-                case J2S_ARRAY:
-                default:
-                    break;
-            }
-        }
-    }
-
-    free(self);
-    return;
-}
-#endif
 
 // not support inner loop
 int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
@@ -265,7 +264,6 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                 struct j2sobject *child = NULL;
                 if (pt->offset_len == 0) {
                     struct j2sobject **ptr = (struct j2sobject **)((char *)self + pt->offset);
-                    //child = pt->proto->ctor();
                     child = j2sobject_create(pt->proto);
                     *ptr = child;
                 } else {
@@ -382,7 +380,6 @@ int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target) {
                     object = *(struct j2sobject **)((char *)self + pt->offset);
                 } else {
                     object = (struct j2sobject *)((char *)self + pt->offset);
-                    pt->proto->ctor(object);
                 }
                 j2sobject_serialize_cjson(object, child);
 

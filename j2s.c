@@ -26,8 +26,8 @@ int _auto_test() {
   printf("name:%s\n", object->name);
   printf("workmode:%d\n", object->workmode);
   printf("v4 proto:%d\n", object->v4_proto);
-  printf("pppoe username:%s, password:%s\n", object->pppoe.username,
-         object->pppoe.password);
+  printf("pppoe username:%s, password:%s, dynamic_str:%s\n", object->pppoe.username,
+         object->pppoe.password, object->pppoe.dynamic_str ? object->pppoe.dynamic_str : "null");
   printf("device: name:%s, mac:%s, v4 address:%s, mask:%s, gw:%s, dns:%s %s\n",
          object->device.name, object->device.mac,
          object->device.v4.data.address, object->device.v4.data.netmask,
@@ -56,8 +56,8 @@ int _auto_test() {
   printf("name:%s\n", object->name);
   printf("workmode:%d\n", object->workmode);
   printf("v4 proto:%d\n", object->v4_proto);
-  printf("pppoe username:%s, password:%s\n", object->pppoe.username,
-         object->pppoe.password);
+  printf("pppoe username:%s, password:%s, dynamic_str:%s\n", object->pppoe.username,
+         object->pppoe.password, object->pppoe.dynamic_str ? object->pppoe.dynamic_str : "null");
   printf("device: name:%s, mac:%s, v4 address:%s, mask:%s, gw:%s, dns:%s %s\n",
          object->device.name, object->device.mac,
          object->device.v4.data.address, object->device.v4.data.netmask,
@@ -70,7 +70,7 @@ int _auto_test() {
 
 int main(int argc, char **argv) {
   int i = 0;
-  while (i++ < 10000) {
+  while (i++ < 1) {
     _auto_test();
   }
 

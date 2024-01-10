@@ -1,6 +1,6 @@
 
 
-gcc j2s.c j2sobject.c hrserver_object.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2s
+gcc -g j2s.c j2sobject.c hrserver_object.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2s
 
 
 # 查看运行结果

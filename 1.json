@@ -17,6 +17,7 @@
    },
    "pppoe":{
       "username":"myname",
-      "password":"mypassword"
+      "password":"mypassword",
+      "dynamic_str":"memory is allocated"
    }
 }

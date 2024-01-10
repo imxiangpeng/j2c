@@ -69,6 +69,7 @@ typedef struct hrobject_pppoe {
     J2SOBJECT_DECLARE_OBJECT;
     char username[HRIF_WAN_PPPOE_USERNAME_LEN];
     char password[HRIF_WAN_PPPOE_PASSWORD_LEN];
+    char* dynamic_str;
 } hrobject_pppoe_t;
 
 typedef struct hrobject_wan {
