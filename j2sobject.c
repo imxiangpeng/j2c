@@ -170,11 +170,11 @@ void j2sobject_free(struct j2sobject *self) {
             case J2S_STRING: {
                 // char* -> char**
                 // char [] -> char*
-                char *str = NULL;
                 if (pt->offset_len == 0) {  // char*
-                    str = *(char **)((char *)self + pt->offset);
-                    if (str) {
-                        free(str);
+                    char **str = (char **)((char *)self + pt->offset);
+                    if (*str) {
+                        free(*str);
+                        *str = NULL;  // force clear the member
                     }
                 }
 
@@ -185,8 +185,11 @@ void j2sobject_free(struct j2sobject *self) {
                 // pt->offset_len 0: -> pointer
                 //              > 0: -> struct data
                 if (pt->offset_len == 0) {
-                    object = *(struct j2sobject **)((char *)self + pt->offset);
-                    j2sobject_free(object);
+                    struct j2sobject **ptr = (struct j2sobject **)((char *)self + pt->offset);
+                    if (*ptr != NULL) {
+                        j2sobject_free(*ptr);
+                        *ptr = NULL;  // force clear the member
+                    }
                 } else {
                     object = (struct j2sobject *)((char *)self + pt->offset);
                     // care that if object contains char* memory(which maybe allocated in deserialize),

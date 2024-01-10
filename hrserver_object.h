@@ -80,6 +80,7 @@ typedef struct hrobject_wan {
 
     hrif_protocol_e v4_proto;
     hrobject_pppoe_t pppoe;
+    hrobject_pppoe_t *pppoe_ptr;
     hrobject_network_device_t device;
     hrobject_network_stats_t stats;
 } hrobject_wan_t;

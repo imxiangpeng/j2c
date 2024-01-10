@@ -124,6 +124,7 @@ static struct j2sobject_fields_prototype _hrobject_wan_fields_prototype[] = {
     {.name = "v4_proto",          .type = J2S_INT,       .offset = _J2SOBJECT_WAN_DATA_OFFSET(v4_proto),          .offset_len = 0 },
     {.name = "device",            .type = J2S_OBJECT,    .offset = _J2SOBJECT_WAN_DATA_OFFSET(device),          .offset_len = _J2SOBJECT_WAN_DATA_LEN(device), .proto = &_hrobject_network_device_prototype},
     {.name = "pppoe",            .type = J2S_OBJECT,    .offset = _J2SOBJECT_WAN_DATA_OFFSET(pppoe),          .offset_len = _J2SOBJECT_WAN_DATA_LEN(pppoe), .proto = &_hrobject_pppoe_prototype},
+    {.name = "pppoe_ptr",            .type = J2S_OBJECT,    .offset = _J2SOBJECT_WAN_DATA_OFFSET(pppoe_ptr),          .offset_len = 0, .proto = &_hrobject_pppoe_prototype},
     {0}
 };
 // clang-format on
@@ -162,14 +163,14 @@ static int hrobject_pppoe_ctor(struct j2sobject *obj) {
         return -1;
     obj->name = "pppoe";
     obj->field_protos = _hrobject_pppoe_fields_prototype;
-    printf("%s(%d): ctor:%p, dynamic_str:%s\n", __FUNCTION__, __LINE__, obj, ((hrobject_pppoe_t*)obj)->dynamic_str);
+    printf("%s(%d): ctor:%p, dynamic_str:%p\n", __FUNCTION__, __LINE__, obj, ((hrobject_pppoe_t*)obj)->dynamic_str);
 
     return 0;
 }
 
 static int hrobject_pppoe_dtor(struct j2sobject *obj) {
     if (!obj) return 0;
-    printf("%s(%d): dtor:%p, dynamic_str:%s\n", __FUNCTION__, __LINE__, obj, ((hrobject_pppoe_t*)obj)->dynamic_str);
+    printf("%s(%d): dtor:%p, dynamic_str:%p\n", __FUNCTION__, __LINE__, obj, ((hrobject_pppoe_t*)obj)->dynamic_str);
     if (((hrobject_pppoe_t*)obj)->dynamic_str) {
         free(((hrobject_pppoe_t*)obj)->dynamic_str);
         ((hrobject_pppoe_t*)obj)->dynamic_str = NULL;
