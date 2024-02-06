@@ -14,7 +14,7 @@
 #ifndef _J2SOBJECT_H_
 #define _J2SOBJECT_H_
 
-#include <stddef.h>
+#include <stdint.h>
 
 #define J2SOBJECT_DECLARE_OBJECT struct j2sobject __object__
 #define J2SOBJECT(self) ((struct j2sobject *)self)
@@ -49,8 +49,8 @@ struct j2sobject_prototype {
 struct j2sobject_fields_prototype {
     const char *name;
     int type; // object type
-    size_t offset;
-    size_t offset_len;
+    uint32_t offset;
+    uint32_t offset_len;
 
     // should not null when cur field is object
     struct j2sobject_prototype *proto;
@@ -67,12 +67,15 @@ struct j2sobject {
     //void *priv_data;  // preferred when deserializer
 
     //size_t size;  // array element numbers
+    // support array object
+    struct j2sobject *prev, *next;
 };
 
 //typedef struct j2sobject *(*j2sobject_allocate_handler)();
 
 //struct j2sobject *j2sobject_create(enum j2stype type, size_t size);
 struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto);
+struct j2sobject *j2sobject_create_array(struct j2sobject_prototype *proto);
 void j2sobject_free(struct j2sobject *self);
 
 // clear all payload data memory
@@ -81,6 +84,7 @@ int j2sobject_reset(struct j2sobject *self);
 int j2sobject_deserialize(struct j2sobject *self, const char *jstr);
 int j2sobject_deserialize_cjson(struct j2sobject *self, struct cJSON *jobj);
 int j2sobject_deserialize_file(struct j2sobject *self, const char *path);
+int j2sobject_deserialize_array_cjson(struct j2sobject *self, struct cJSON *jobj);
 // must be freed manually
 char *j2sobject_serialize(struct j2sobject *self);
 int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target);

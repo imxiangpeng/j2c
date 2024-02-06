@@ -2,6 +2,7 @@
 
 gcc -g j2s.c j2sobject.c hrserver_object.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2s
 
+gcc -g j2sobject.c mactbl_array.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o mactbl_array
 
 # 查看运行结果
 ./j2s
@@ -88,6 +89,14 @@ static struct j2cobject_prototype hrobject_wan_prototype[] = {
     {0}
 }
 
+
+PS.20240206, 开始支持数组对象，仅限顶层对象数组，例如:[{},{}]， 不支持 [1,2,...] 或者 ["x","y"]
+数组对象请通过 j2sobject_create_array 创建，传递的 proto 是对象的原型。
+只有这样，我们在解析数组的时候才指导如何创建子对象
+
+如果手动创建对象，需要注意必须设置 type/proto 字段以及初始化 next/prev 指针指向自身！
+
+相关使用方法参考： mactbl_array.c
 
 
 

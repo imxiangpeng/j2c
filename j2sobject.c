@@ -112,26 +112,7 @@ j2sobject_field_prototype(struct j2sobject *self, const char *field) {
     }
     return NULL;
 }
-#if 0
-struct j2sobject *j2sobject_create_removed(enum j2stype type, size_t size) {
-    struct j2sobject *object = (struct j2sobject *)calloc(1, size);
 
-    switch (type) {
-        case J2S_OBJECT:
-            J2SOBJECT(object)->type = type;
-            J2SOBJECT(object)->name = "object";
-            break;
-        case J2S_ARRAY:
-            J2SOBJECT(object)->type = type;
-            J2SOBJECT(object)->name = "array";
-            break;
-        default:
-            break;
-    }
-
-    return object;
-}
-#endif
 struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
     struct j2sobject *self = NULL;
     if (!proto)
@@ -154,16 +135,66 @@ struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
     if (!self->proto)
         self->proto = proto;
 
+    // init list
+    self->next = self->prev = self;
     return self;
 }
+
+// create object array
+struct j2sobject *j2sobject_create_array(struct j2sobject_prototype *proto) {
+    struct j2sobject *self = NULL;
+
+    if (!proto)
+        return NULL;
+
+    if (proto->type != J2S_OBJECT) {
+        printf("now only support J2S_OBJECT, not support:%d ...\n", proto->type);
+        return NULL;
+    }
+
+    if (!proto->ctor || proto->size == 0) {
+        printf("curr object:%s does not support construct dynamic ...\n", proto->name ? proto->name : "unknown");
+        return NULL;
+    }
+
+    self = (struct j2sobject *)calloc(1, proto->size);
+
+    // must special array & proto
+    self->type = J2S_ARRAY;
+    // using proto as subobject proto, so we known child type
+    self->proto = proto;
+
+    // must init list
+    self->next = self->prev = self;
+    return self;
+}
+
 void j2sobject_free(struct j2sobject *self) {
     const struct j2sobject_fields_prototype *pt = NULL;
-    if (!self || !self->proto || !self->field_protos) {
+    if (!self || !self->proto) {
+        return;
+    }
+
+    if (self->type == J2S_ARRAY) {
+        struct j2sobject *p = NULL, *n = NULL;
+        // loop all elements free all element
+        for (p = self->next, n = p->next; p != self; p = n, n = p->next) {
+            p->prev->next = p->next;
+            p->next->prev = p->prev;
+            j2sobject_free(p);
+        }
+
+        memset((void*)self, 0, sizeof(struct j2sobject));
+        free(self);
         return;
     }
 
     // should release all elements
     pt = self->field_protos;
+
+    if (!pt) {
+        return;
+    }
 
     for (; pt->name != NULL; pt++) {
         switch (pt->type) {
@@ -210,6 +241,7 @@ void j2sobject_free(struct j2sobject *self) {
     if (self->proto->dtor)
         self->proto->dtor(self);
 
+    self->next = self->prev = NULL;
     free(self);
 }
 
@@ -227,7 +259,7 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
 
     cJSON *ele = NULL;
 
-    if (0 == cJSON_IsObject(jobj)) {
+    if (!cJSON_IsObject(jobj)) {
         return -1;
     }
     cJSON_ArrayForEach(ele, jobj) {
@@ -259,6 +291,11 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                     *ptr = strdup(cJSON_GetStringValue(ele));
                 } else {  // char[]
                     char *ptr = (char *)((char *)self + pt->offset);
+                    // make sure no data loss
+                    if (strlen(cJSON_GetStringValue(ele)) > pt->offset_len - 1) {
+                        printf("string value too long ..., allow max:%d\n", pt->offset_len);
+                        goto error;
+                    }
                     snprintf(ptr, pt->offset_len, "%s", cJSON_GetStringValue(ele));
                 }
                 break;
@@ -279,6 +316,7 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                 j2sobject_deserialize_cjson(child, ele);
             } break;
             case cJSON_Array: {
+                // we can not do this, because we must known the real object type
                 printf("deserialize: current we do not support array ...\n");
             } break;
 
@@ -289,6 +327,42 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
 
     return 0;
 error:
+    return -1;
+}
+
+// j2sobject array should contains child's proto, otherwise we can not create
+// child object
+// we only support [{},{}]
+// not support [1,2,3,...] or ["x","y",...]
+int j2sobject_deserialize_array_cjson(struct j2sobject *self, cJSON *jobj) {
+    cJSON *ele = NULL;
+    struct j2sobject *p = NULL, *n = NULL;
+    if (!self || self->type != J2S_ARRAY || !jobj || !cJSON_IsArray(jobj)) {
+        return -1;
+    }
+
+    // assert self's prev/next have been inited
+
+    cJSON_ArrayForEach(ele, jobj) {
+        struct j2sobject *child = j2sobject_create(self->proto);
+        // add to array list
+        self->prev->next = child;
+        child->prev = self->prev;
+        child->next = self;
+        self->prev = child;
+        if (j2sobject_deserialize_cjson(child, ele) != 0) {
+            goto failed;
+        }
+    }
+    return 0;
+
+failed:
+    // loop all elements free all element
+    for (p = self->next, n = p->next; p != self; p = n, n = p->next) {
+        j2sobject_free(p);
+        p->prev->next = p->next;
+        p->next->prev = p->prev;
+    }
     return -1;
 }
 
@@ -303,7 +377,11 @@ int j2sobject_deserialize(struct j2sobject *self, const char *jstr) {
         return -1;
     }
 
-    ret = j2sobject_deserialize_cjson(self, obj);
+    if (cJSON_IsArray(obj)) {
+        ret = j2sobject_deserialize_array_cjson(self, obj);
+    } else {
+        ret = j2sobject_deserialize_cjson(self, obj);
+    }
     cJSON_Delete(obj);
 
     return ret;
@@ -330,8 +408,11 @@ int j2sobject_deserialize_file(struct j2sobject *self, const char *path) {
         free(data);
         return -1;
     }
-
-    ret = j2sobject_deserialize_cjson(self, root);
+    if (cJSON_IsArray(root)) {
+        ret = j2sobject_deserialize_array_cjson(self, root);
+    } else {
+        ret = j2sobject_deserialize_cjson(self, root);
+    }
     cJSON_Delete(root);
 
     free(data);
@@ -385,6 +466,11 @@ int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target) {
                     object = *(struct j2sobject **)((char *)self + pt->offset);
                 } else {
                     object = (struct j2sobject *)((char *)self + pt->offset);
+                }
+                // must manual init object's fields
+                // when it's sub struct, the header maybe invalid
+                if (!object->name) {
+                    pt->proto->ctor(object);
                 }
                 j2sobject_serialize_cjson(object, child);
 
