@@ -16,8 +16,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifndef HRTBL_BASE_DB_PATH
-#define HRTBL_BASE_DB_PATH "./hrtbls"
+#ifndef J2STBL_BASE_DB_PATH
+#define J2STBL_BASE_DB_PATH "./j2stbls"
 #endif
 
 static int _j2stable_init(struct j2stable *tbl) {
@@ -62,7 +62,7 @@ struct j2stable *j2stable_init(const char *name,
     // real fields id started from 1
     tbl->object.__id__ = 0;
 
-    if (asprintf(&tbl->path, "%s/%s.json", HRTBL_BASE_DB_PATH, name) < 0) {
+    if (asprintf(&tbl->path, "%s/%s.json", J2STBL_BASE_DB_PATH, name) < 0) {
         free(tbl);
         return NULL;
     }
@@ -128,12 +128,20 @@ int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self) {
 
     // 1. target self is already on object list?
     // you should call update when it's exits!
+#if 0
     for (e = J2SOBJECT(&tbl->object)->next; e != J2SOBJECT(&tbl->object); e = e->next) {
         if (e == J2SOBJECT(self)) {
             printf("Insert: Error target is already exist!\n");
             return -1;
         }
     }
+#else
+    (void)e;
+    // or make sure current object is not on any link list
+    if ((J2SOBJECT(self)->next !=J2SOBJECT(self)) || (J2SOBJECT(self)->next != J2SOBJECT(self)->prev)) {
+        return -1;
+    }
+#endif
 
     // 2. only access new self object
     J2SOBJECT(&tbl->object)->prev->next = J2SOBJECT(self);

@@ -115,6 +115,11 @@ typedef struct {
 在 j2stbl_object 对象中有个自增字段： __id__，每次插入（尾部）会自动基于前一条记录 +1；
 请注意，该字段只读，请不要操作该字段。
 
+注意，因为这个定位就是处理小数据，在处理较大数据时，并没有考虑太多性能问题！
+
+同时，目前我们使用的 cJSON 不支持流式解析，对于非常大的 json 文件，我们可能也会存在内存性能问题。
+关于内存，在 j2stable_init 调用后， json 数据就会被 cache 到内存中，对于数据非常大的情况是不理想的
+
 其他详细使用参考：j2stable_main.c
 
 gcc -g j2sobject.c j2stable.c j2stable_main.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2stbl_main
