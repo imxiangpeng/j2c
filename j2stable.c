@@ -44,7 +44,7 @@ static int _j2stable_init(struct j2stable *tbl) {
 
 // db: database name
 struct j2stable *j2stable_init(const char *name,
-                         struct j2sobject_prototype *proto) {
+                               struct j2sobject_prototype *proto) {
     struct j2stable *tbl = NULL;
     if (!name || !proto || !proto->ctor || 0 == proto->size) {
         return NULL;
@@ -110,13 +110,33 @@ static int _j2stable_commit(struct j2stable *tbl) {
         return 0;
     }
 
+    tbl->state = 0;
+
     return j2sobject_serialize_file(J2SOBJECT(&tbl->object), tbl->path);
 }
 int j2stable_update(struct j2stable *tbl, struct j2stbl_object *self) {
     if (!tbl || !self)
         return -1;
 
-    tbl->state |= J2STBL_OPBIT_INSERT;
+    tbl->state |= J2STBL_OPBIT_UPDATE;
+    _j2stable_commit(tbl);
+    return 0;
+}
+
+int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self) {
+    if (!tbl || !self)
+        return -1;
+
+    // tick off from link
+    J2SOBJECT(self)->prev->next = J2SOBJECT(self)->next;
+    J2SOBJECT(self)->next->prev = J2SOBJECT(self)->prev;
+
+    // reset link point
+    J2SOBJECT(self)->next = J2SOBJECT(self);
+    J2SOBJECT(self)->prev = J2SOBJECT(self);
+
+    tbl->state |= J2STBL_OPBIT_DELETE;
+    _j2stable_commit(tbl);
     return 0;
 }
 
@@ -139,6 +159,7 @@ int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self) {
     (void)e;
     // or make sure current object is not on any link list
     if ((J2SOBJECT(self)->next !=J2SOBJECT(self)) || (J2SOBJECT(self)->next != J2SOBJECT(self)->prev)) {
+        printf("Insert: Error target maybe already exist!\n");
         return -1;
     }
 #endif

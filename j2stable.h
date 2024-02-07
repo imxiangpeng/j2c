@@ -34,6 +34,8 @@ void j2stable_deinit(struct j2stable *tbl);
 
 int j2stable_empty(struct j2stable *tbl);
 
+int j2stable_update(struct j2stable *tbl, struct j2stbl_object *self);
+int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self);
 // object.id will auto increase ++
 int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self);
 #endif // _J2STABLE_H_
