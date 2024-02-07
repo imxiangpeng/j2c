@@ -26,18 +26,9 @@ struct j2sobject_prototype hrtbl_mac_tbl_prototype = {.name = "mac_tbl",
 };
 
 static struct j2sobject_fields_prototype _hrtbl_mactbl_fields_prototype[] = {
-    {.name = "id",
-     .type = J2S_INT,
-     .offset = _MACTBL_DATA_OFFSET(id),
-     .offset_len = 0},
-    {.name = "mac",
-     .type = J2S_STRING,
-     .offset = _MACTBL_DATA_OFFSET(mac),
-     .offset_len = _MACTBL_DATA_LEN(mac)},
-    {.name = "type",
-     .type = J2S_INT,
-     .offset = _MACTBL_DATA_OFFSET(type),
-     .offset_len = 0},
+    {.name = "id", .type = J2S_INT, .offset = _MACTBL_DATA_OFFSET(id), .offset_len = 0},
+    {.name = "mac", .type = J2S_STRING, .offset = _MACTBL_DATA_OFFSET(mac), .offset_len = _MACTBL_DATA_LEN(mac)},
+    {.name = "type", .type = J2S_INT, .offset = _MACTBL_DATA_OFFSET(type), .offset_len = 0},
     {0}};
 
 static int hrtbl_mactbl_ctor(struct j2sobject *obj) {

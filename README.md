@@ -98,5 +98,26 @@ PS.20240206, 开始支持数组对象，仅限顶层对象数组，例如:[{},{}
 
 相关使用方法参考： mactbl_array.c
 
+PS. 20240207 添加 j2stable 一个非常简单的基于 json 来实现的数据表，每一个条目我们认为是一个记录一个对象 j2stbl_object
+具体实现时需要定义自己的数据格式/表格式（采用结构体表示），结构体在定义时首先引入：J2STBL_DECLARE_OBJECT
+例如：
+typedef struct {
+    J2STBL_DECLARE_OBJECT;
+    int id;
+    char mac[18];
+    int type;
+} j2stbl_mactbl_t;
+
+接下来参考j2sobject 使用方法定义：j2sobject_prototype/j2sobject_fields_prototype
+
+需要操作数据时，首先调用 j2stable_init， 第一个参数是要操作的表名称（每个表我们认为时一个 json 文件:name.json）
+
+在 j2stbl_object 对象中有个自增字段： __id__，每次插入（尾部）会自动基于前一条记录 +1；
+请注意，该字段只读，请不要操作该字段。
+
+其他详细使用参考：j2stable_main.c
+
+gcc -g j2sobject.c j2stable.c j2stable_main.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o j2stbl_main
+
 
 
