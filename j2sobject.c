@@ -140,6 +140,9 @@ struct j2sobject *j2sobject_create(struct j2sobject_prototype *proto) {
 
     self = (struct j2sobject *)calloc(1, proto->size);
 
+    // must special array & proto
+    self->type = J2S_OBJECT;
+
     proto->ctor(self);
 
     // setup object proto only when construct not do
@@ -222,6 +225,7 @@ void j2sobject_free(struct j2sobject *self) {
 
                 break;
             }
+            case J2S_ARRAY:
             case J2S_OBJECT: {
                 struct j2sobject *object = NULL;
                 // pt->offset_len 0: -> pointer
@@ -239,9 +243,6 @@ void j2sobject_free(struct j2sobject *self) {
                     if (pt->proto->dtor)
                         pt->proto->dtor(object);
                 }
-                break;
-            }
-            case J2S_ARRAY: {
                 break;
             }
             default:
@@ -329,6 +330,17 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
             case cJSON_Array: {
                 // we can not do this, because we must known the real object type
                 printf("deserialize: current we do not support array ...\n");
+                struct j2sobject *child = NULL;
+                if (pt->offset_len == 0) {
+                    struct j2sobject **ptr = (struct j2sobject **)((char *)self + pt->offset);
+                    child = j2sobject_create_array(pt->proto);
+                    *ptr = child;
+                } else {
+                    child = (struct j2sobject *)((char *)self + pt->offset);
+                    // must call init to setup prototype
+                    pt->proto->ctor(child);
+                }
+                j2sobject_deserialize_array_cjson(child, ele);
             } break;
 
             default:
@@ -488,6 +500,22 @@ int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target) {
                 break;
             }
             case J2S_ARRAY: {
+                struct j2sobject *object = NULL;
+                cJSON *array = cJSON_CreateArray();
+                cJSON_AddItemToObject(root, pt->name, array);
+                if (pt->offset_len == 0) {
+                    object = *(struct j2sobject **)((char *)self + pt->offset);
+                } else {
+                    object = (struct j2sobject *)((char *)self + pt->offset);
+                }
+                // must manual init object's fields
+                // when it's sub struct, the header maybe invalid
+                if (!object->name) {
+                    pt->proto->ctor(object);
+                }
+
+                j2sobject_serialize_array_cjson(object, array);
+
                 break;
             }
             default:
@@ -566,6 +594,7 @@ int j2sobject_serialize_file(struct j2sobject *self, const char *path) {
 
     data = j2sobject_serialize(self);
     if (!data) {
+        unlink(tmp);
         free(tmp);
         close(fd);
         return -1;
