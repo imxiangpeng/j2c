@@ -328,8 +328,7 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                 j2sobject_deserialize_cjson(child, ele);
             } break;
             case cJSON_Array: {
-                // we can not do this, because we must known the real object type
-                printf("deserialize: current we do not support array ...\n");
+                // array 's proto is array subobject's proto
                 struct j2sobject *child = NULL;
                 if (pt->offset_len == 0) {
                     struct j2sobject **ptr = (struct j2sobject **)((char *)self + pt->offset);

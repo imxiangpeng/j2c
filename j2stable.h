@@ -26,7 +26,10 @@ struct j2stable {
 
   int state;
 
-  struct j2stbl_object object;
+  // database or table version for compatible
+  int version;
+
+  struct j2sobject* priv;
 };
 
 struct j2stable *j2stable_init(const char *table, struct j2sobject_prototype *proto);
@@ -34,6 +37,7 @@ void j2stable_deinit(struct j2stable *tbl);
 
 int j2stable_empty(struct j2stable *tbl);
 
+struct j2stbl_object* j2stable_query_all(struct j2stable *tbl);
 int j2stable_update(struct j2stable *tbl, struct j2stbl_object *self);
 int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self);
 // object.id will auto increase ++

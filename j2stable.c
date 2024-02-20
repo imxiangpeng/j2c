@@ -16,8 +16,60 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+// default we store some extra information such version in table
+// root is an object which data field is read array data
+// when set this macro to 1
+// data will be stored using raw json array object without any extra data
+#define J2STBL_RAW_ARRAY 0
+
 #ifndef J2STBL_BASE_DB_PATH
 #define J2STBL_BASE_DB_PATH "./j2stbls"
+#endif
+
+#define J2STBL_DEFAULT_INDEX_ID (1)
+
+#define J2STBL_PRIV_DATA_FIELD "data"
+
+#define J2STBL_PRIV(o) ((struct j2stbl_priv *)o)
+
+#if !J2STBL_RAW_ARRAY
+struct j2stbl_priv {
+    J2SOBJECT_DECLARE_OBJECT;
+    int version;
+    struct j2stbl_object *data;
+};
+
+static struct j2sobject_fields_prototype _j2stbl_priv_fields_prototype[] = {
+    {.name = "version", .type = J2S_INT, .offset = offsetof(struct j2stbl_priv, version), .offset_len = 0},
+    {.name = "data", .type = J2S_ARRAY, .offset = offsetof(struct j2stbl_priv, data), .offset_len = 0, .proto = NULL /*unknown now*/},
+    {0}};
+
+int j2stbl_priv_ctor(struct j2sobject *obj) {
+    if (!obj)
+        return -1;
+    obj->name = "j2stbl";
+    // data's proto should be auto adjust, so we using dynamic memory
+    obj->field_protos = calloc(1, sizeof(_j2stbl_priv_fields_prototype));
+    memcpy((void *)obj->field_protos, (void *)_j2stbl_priv_fields_prototype, sizeof(_j2stbl_priv_fields_prototype));
+    return 0;
+}
+
+static int j2stbl_priv_dtor(struct j2sobject *obj) {
+    if (!obj) return 0;
+
+    if (obj->field_protos) {
+        free((void *)obj->field_protos);
+        obj->field_protos = NULL;
+    }
+    return 0;
+}
+
+static struct j2sobject_prototype _j2stbl_priv_prototype = {
+    .name = "j2stbl",
+    .type = J2S_OBJECT,
+    .size = sizeof(struct j2stbl_priv),
+    .ctor = j2stbl_priv_ctor,
+    .dtor = j2stbl_priv_dtor};
 #endif
 
 static int _j2stable_init(struct j2stable *tbl) {
@@ -35,7 +87,7 @@ static int _j2stable_init(struct j2stable *tbl) {
         return 0;
     }
 
-    ret = j2sobject_deserialize_file(J2SOBJECT(&tbl->object), tbl->path);
+    ret = j2sobject_deserialize_file(J2SOBJECT(tbl->priv), tbl->path);
     if (0 != ret) {
     }
 
@@ -46,6 +98,9 @@ static int _j2stable_init(struct j2stable *tbl) {
 struct j2stable *j2stable_init(const char *name,
                                struct j2sobject_prototype *proto) {
     struct j2stable *tbl = NULL;
+#if !J2STBL_RAW_ARRAY
+    struct j2sobject_fields_prototype *pt = NULL;
+#endif
     if (!name || !proto || !proto->ctor || 0 == proto->size) {
         return NULL;
     }
@@ -55,12 +110,35 @@ struct j2stable *j2stable_init(const char *name,
         return NULL;
     }
 
-    // must init head
-    J2SOBJECT(&tbl->object)->type = J2S_ARRAY;
-    J2SOBJECT(&tbl->object)->proto = proto;
-    J2SOBJECT(&tbl->object)->next = J2SOBJECT(&tbl->object)->prev = J2SOBJECT(&tbl->object);
-    // real fields id started from 1
-    tbl->object.__id__ = 0;
+#if J2STBL_RAW_ARRAY
+    // because proto must be j2stbl_object, so tbl->priv is also j2stbl_object(memory is equal)
+    tbl->priv = j2sobject_create_array(proto);
+    if (!tbl->priv) {
+        free(tbl);
+        return NULL;
+    }
+#else
+    tbl->priv = j2sobject_create(&_j2stbl_priv_prototype);
+    if (!tbl->priv || !tbl->priv->field_protos) {
+        free(tbl);
+        return NULL;
+    }
+
+    // find data fields & update proto
+    pt = (struct j2sobject_fields_prototype *)tbl->priv->field_protos;
+    for (; pt && pt->name; pt++) {
+        if (0 == strcmp(J2STBL_PRIV_DATA_FIELD, pt->name)) {
+            pt->proto = proto;
+            break;
+        }
+    }
+
+    if (!pt->name) {
+        // can not find data field!
+        free(tbl);
+        return NULL;
+    }
+#endif
 
     if (asprintf(&tbl->path, "%s/%s.json", J2STBL_BASE_DB_PATH, name) < 0) {
         free(tbl);
@@ -69,21 +147,22 @@ struct j2stable *j2stable_init(const char *name,
 
     _j2stable_init(tbl);
 
+#if !J2STBL_RAW_ARRAY
+    if (!J2STBL_PRIV(tbl->priv)->data) {
+        // must pre init data fields, because the table maybe empty or error
+        J2STBL_PRIV(tbl->priv)->data = (struct j2stbl_object *)j2sobject_create_array(proto);
+    }
+#endif
+
     return tbl;
 }
 
 void j2stable_deinit(struct j2stable *tbl) {
-    struct j2sobject *p = NULL, *n = NULL;
     if (!tbl) return;
 
-    // hrtbl.object is not allocated using j2sobject_create_array
-    // so we should manual release all elements
-    // loop all elements free all element
-    for (p = J2SOBJECT(&tbl->object)->next, n = p->next; p != J2SOBJECT(&tbl->object); p = n, n = p->next) {
-        p->prev->next = p->next;
-        p->next->prev = p->prev;
-        j2sobject_free(p);
-    }
+
+    j2sobject_free(tbl->priv);
+    tbl->priv = NULL;
 
     if (tbl->path)
         free(tbl->path);
@@ -94,9 +173,20 @@ void j2stable_deinit(struct j2stable *tbl) {
 }
 
 int j2stable_empty(struct j2stable *tbl) {
-    if (!tbl) return 0;
+    struct j2sobject *data = NULL;
+    if (!tbl || !tbl->priv) return 0;
 
-    if (J2SOBJECT(&tbl->object)->next == J2SOBJECT(&tbl->object)) return 1;
+        // assert
+#if J2STBL_RAW_ARRAY
+    data = tbl->priv;
+#else
+    // assert(data->type == J2S_ARRAY);
+    data = J2SOBJECT(J2STBL_PRIV(tbl->priv)->data);
+#endif
+    if (!data) return 0;
+    // the object is array and next -> self
+    if (data->next == data) return 1;
+    // if (J2SOBJECT(&tbl->object)->next == J2SOBJECT(&tbl->object)) return 1;
 
     return 0;
 }
@@ -110,9 +200,22 @@ static int _j2stable_commit(struct j2stable *tbl) {
         return 0;
     }
 
-    tbl->state = 0;
+    return j2sobject_serialize_file(tbl->priv, tbl->path);
+}
 
-    return j2sobject_serialize_file(J2SOBJECT(&tbl->object), tbl->path);
+struct j2stbl_object *j2stable_query_all(struct j2stable *tbl) {
+    struct j2stbl_object *data = NULL;
+    if (j2stable_empty(tbl)) {
+        return NULL;
+    }
+#if J2STBL_RAW_ARRAY
+    data = (struct j2stbl_object *)tbl->priv;
+#else
+    // assert(data->type == J2S_ARRAY);
+    data = J2STBL_PRIV(tbl->priv)->data;
+#endif
+
+    return data;
 }
 int j2stable_update(struct j2stable *tbl, struct j2stbl_object *self) {
     if (!tbl || !self)
@@ -142,35 +245,43 @@ int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self) {
 
 // after insert you should not free it again, it will be auto free when posible
 int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self) {
+    struct j2sobject *data = NULL;
     struct j2sobject *e = NULL;
     if (!tbl || !self)
         return -1;
 
     // 1. target self is already on object list?
     // you should call update when it's exits!
-#if 0
-    for (e = J2SOBJECT(&tbl->object)->next; e != J2SOBJECT(&tbl->object); e = e->next) {
-        if (e == J2SOBJECT(self)) {
-            printf("Insert: Error target is already exist!\n");
-            return -1;
-        }
-    }
-#else
+
     (void)e;
     // or make sure current object is not on any link list
-    if ((J2SOBJECT(self)->next !=J2SOBJECT(self)) || (J2SOBJECT(self)->next != J2SOBJECT(self)->prev)) {
+    if ((J2SOBJECT(self)->next != J2SOBJECT(self)) || (J2SOBJECT(self)->next != J2SOBJECT(self)->prev)) {
         printf("Insert: Error target maybe already exist!\n");
         return -1;
     }
-#endif
+
 
     // 2. only access new self object
-    J2SOBJECT(&tbl->object)->prev->next = J2SOBJECT(self);
-    J2SOBJECT(self)->prev = J2SOBJECT(&tbl->object)->prev;
-    J2SOBJECT(self)->next = J2SOBJECT(&tbl->object);
-    J2SOBJECT(&tbl->object)->prev = J2SOBJECT(self);
+#if J2STBL_RAW_ARRAY
+    data = tbl->priv;
+#else
 
-    self->__id__ = J2STBL_OBJECT_SELF(J2SOBJECT(self)->prev)->__id__ + 1;
+    // assert(data->type == J2S_ARRAY);
+    data = J2SOBJECT(J2STBL_PRIV(tbl->priv)->data);
+#endif
+    if (!data) return -1;
+
+    data->prev->next = J2SOBJECT(self);
+    J2SOBJECT(self)->prev = data->prev;
+    J2SOBJECT(self)->next = data;
+    data->prev = J2SOBJECT(self);
+
+    // first element after head, care that head is struct j2sobject not j2stbl_object
+    if (J2SOBJECT(self)->prev == data) {
+        self->__id__ = J2STBL_DEFAULT_INDEX_ID;
+    } else {
+        self->__id__ = J2STBL_OBJECT_SELF(J2SOBJECT(self)->prev)->__id__ + 1;
+    }
 
     tbl->state |= J2STBL_OPBIT_INSERT;
 
