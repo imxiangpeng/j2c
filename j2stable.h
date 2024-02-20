@@ -26,15 +26,13 @@ struct j2stable {
 
   int state;
 
-  // database or table version for compatible
-  int version;
-
   struct j2sobject* priv;
 };
 
 struct j2stable *j2stable_init(const char *table, struct j2sobject_prototype *proto);
 void j2stable_deinit(struct j2stable *tbl);
 
+int j2stable_version(struct j2stable *tbl);
 int j2stable_empty(struct j2stable *tbl);
 
 struct j2stbl_object* j2stable_query_all(struct j2stable *tbl);

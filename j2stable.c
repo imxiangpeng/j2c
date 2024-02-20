@@ -16,11 +16,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// default we store some extra information such version in table
-// root is an object which data field is read array data
-// when set this macro to 1
-// data will be stored using raw json array object without any extra data
-#define J2STBL_RAW_ARRAY 0
+// default we directly store data as root object
+// however someone may want to store extra metadata in table
+// such as version which allow you do some compatibility task
+// in this case, json root element is object not array
+// real data is stored in "data" field of root object
+#ifndef J2STBL_STORE_METADATA
+#define J2STBL_STORE_METADATA 0
+#endif
 
 #ifndef J2STBL_BASE_DB_PATH
 #define J2STBL_BASE_DB_PATH "./j2stbls"
@@ -32,10 +35,11 @@
 
 #define J2STBL_PRIV(o) ((struct j2stbl_priv *)o)
 
-#if !J2STBL_RAW_ARRAY
+#if J2STBL_STORE_METADATA
 struct j2stbl_priv {
     J2SOBJECT_DECLARE_OBJECT;
     int version;
+    // some other metadata fields
     struct j2stbl_object *data;
 };
 
@@ -98,7 +102,7 @@ static int _j2stable_init(struct j2stable *tbl) {
 struct j2stable *j2stable_init(const char *name,
                                struct j2sobject_prototype *proto) {
     struct j2stable *tbl = NULL;
-#if !J2STBL_RAW_ARRAY
+#if J2STBL_STORE_METADATA
     struct j2sobject_fields_prototype *pt = NULL;
 #endif
     if (!name || !proto || !proto->ctor || 0 == proto->size) {
@@ -110,14 +114,7 @@ struct j2stable *j2stable_init(const char *name,
         return NULL;
     }
 
-#if J2STBL_RAW_ARRAY
-    // because proto must be j2stbl_object, so tbl->priv is also j2stbl_object(memory is equal)
-    tbl->priv = j2sobject_create_array(proto);
-    if (!tbl->priv) {
-        free(tbl);
-        return NULL;
-    }
-#else
+#if J2STBL_STORE_METADATA
     tbl->priv = j2sobject_create(&_j2stbl_priv_prototype);
     if (!tbl->priv || !tbl->priv->field_protos) {
         free(tbl);
@@ -138,6 +135,13 @@ struct j2stable *j2stable_init(const char *name,
         free(tbl);
         return NULL;
     }
+#else
+    // because proto must be j2stbl_object, so tbl->priv is also j2stbl_object(memory is equal)
+    tbl->priv = j2sobject_create_array(proto);
+    if (!tbl->priv) {
+        free(tbl);
+        return NULL;
+    }
 #endif
 
     if (asprintf(&tbl->path, "%s/%s.json", J2STBL_BASE_DB_PATH, name) < 0) {
@@ -147,7 +151,7 @@ struct j2stable *j2stable_init(const char *name,
 
     _j2stable_init(tbl);
 
-#if !J2STBL_RAW_ARRAY
+#if J2STBL_STORE_METADATA
     if (!J2STBL_PRIV(tbl->priv)->data) {
         // must pre init data fields, because the table maybe empty or error
         J2STBL_PRIV(tbl->priv)->data = (struct j2stbl_object *)j2sobject_create_array(proto);
@@ -160,7 +164,6 @@ struct j2stable *j2stable_init(const char *name,
 void j2stable_deinit(struct j2stable *tbl) {
     if (!tbl) return;
 
-
     j2sobject_free(tbl->priv);
     tbl->priv = NULL;
 
@@ -171,22 +174,29 @@ void j2stable_deinit(struct j2stable *tbl) {
 
     free(tbl);
 }
+int j2stable_version(struct j2stable *tbl) {
+    (void)tbl;
+#if J2STBL_STORE_METADATA
+    if (!tbl || !tbl->priv) return -1;
 
+    return J2STBL_PRIV(tbl->priv)->version;
+#endif
+    return -1;
+}
 int j2stable_empty(struct j2stable *tbl) {
     struct j2sobject *data = NULL;
+
     if (!tbl || !tbl->priv) return 0;
 
-        // assert
-#if J2STBL_RAW_ARRAY
-    data = tbl->priv;
-#else
-    // assert(data->type == J2S_ARRAY);
+#if J2STBL_STORE_METADATA
     data = J2SOBJECT(J2STBL_PRIV(tbl->priv)->data);
+#else
+    data = tbl->priv;
 #endif
+
     if (!data) return 0;
     // the object is array and next -> self
     if (data->next == data) return 1;
-    // if (J2SOBJECT(&tbl->object)->next == J2SOBJECT(&tbl->object)) return 1;
 
     return 0;
 }
@@ -208,11 +218,10 @@ struct j2stbl_object *j2stable_query_all(struct j2stable *tbl) {
     if (j2stable_empty(tbl)) {
         return NULL;
     }
-#if J2STBL_RAW_ARRAY
-    data = (struct j2stbl_object *)tbl->priv;
-#else
-    // assert(data->type == J2S_ARRAY);
+#if J2STBL_STORE_METADATA
     data = J2STBL_PRIV(tbl->priv)->data;
+#else
+    data = (struct j2stbl_object *)tbl->priv;
 #endif
 
     return data;
@@ -246,29 +255,24 @@ int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self) {
 // after insert you should not free it again, it will be auto free when posible
 int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self) {
     struct j2sobject *data = NULL;
-    struct j2sobject *e = NULL;
     if (!tbl || !self)
         return -1;
 
     // 1. target self is already on object list?
     // you should call update when it's exits!
-
-    (void)e;
     // or make sure current object is not on any link list
     if ((J2SOBJECT(self)->next != J2SOBJECT(self)) || (J2SOBJECT(self)->next != J2SOBJECT(self)->prev)) {
         printf("Insert: Error target maybe already exist!\n");
         return -1;
     }
 
-
     // 2. only access new self object
-#if J2STBL_RAW_ARRAY
-    data = tbl->priv;
-#else
-
-    // assert(data->type == J2S_ARRAY);
+#if J2STBL_STORE_METADATA
     data = J2SOBJECT(J2STBL_PRIV(tbl->priv)->data);
+#else
+    data = tbl->priv;
 #endif
+
     if (!data) return -1;
 
     data->prev->next = J2SOBJECT(self);

@@ -127,13 +127,13 @@ gcc -g j2sobject.c j2stable.c j2stable_main.c -I. `pkg-config --cflags libcjson`
 
 PS. 20240220 在 table 中添加一些表相关辅助字段，例如 version 用于标识版本，如果表结构发生变化，我们可以通过这个字段来进行维护；
 
-这个功能是可以通过宏来控制的 `J2STBL_RAW_ARRAY` 如果定义为 0 ，那么我们的数据将采用如下格式：
+这个功能是可以通过宏来控制的 `J2STBL_STORE_METADATA` 如果定义为 `1` ，那么我们的数据将采用如下格式：
 
 ```json
 {"version":0,"data":[{"__id__":1,"id":10,"mac":"6c:0b:84:3c:71:9e","type":1}]}
 ```
 
-如果该字段为 `1`， 数据将是下面格式：
+如果该字段为 `0`， 数据将是下面格式：
 
 ```json
 [{"__id__":1,"id":10,"mac":"6c:0b:84:3c:71:9e","type":1}]
