@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2024 Inspur Group Co., Ltd. Unpublished
+ *
+ * Inspur Group Co., Ltd.
+ * Proprietary & Confidential
+ *
+ * This source code and the algorithms implemented therein constitute
+ * confidential information and may comprise trade secrets of Inspur
+ * or its associates, and any use thereof is subject to the terms and
+ * conditions of the Non-Disclosure Agreement pursuant to which this
+ * source code was originally received.
+ */
+
 // mxp, a very simple json table based on j2sobject
 
 #ifndef _GNU_SOURCE

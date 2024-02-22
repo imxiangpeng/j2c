@@ -1,3 +1,17 @@
+/*
+ * Copyright (C) 2024 Inspur Group Co., Ltd. Unpublished
+ *
+ * Inspur Group Co., Ltd.
+ * Proprietary & Confidential
+ *
+ * This source code and the algorithms implemented therein constitute
+ * confidential information and may comprise trade secrets of Inspur
+ * or its associates, and any use thereof is subject to the terms and
+ * conditions of the Non-Disclosure Agreement pursuant to which this
+ * source code was originally received.
+ */
+
+
 // mxp, 20231229, json <> struct utils
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -271,7 +285,6 @@ int j2sobject_reset(struct j2sobject *self) {
 // not support [1,2,3,...] or ["x","y",...]
 static int _j2sobject_deserialize_array_cjson(struct j2sobject *self, cJSON *jobj) {
     cJSON *ele = NULL;
-    struct j2sobject *p = NULL, *n = NULL;
     if (!self || self->type != J2S_ARRAY || !jobj || !cJSON_IsArray(jobj)) {
         return -1;
     }
