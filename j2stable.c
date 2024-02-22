@@ -239,6 +239,10 @@ int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self) {
     if (!tbl || !self)
         return -1;
 
+    if (J2SOBJECT(self)->next == J2SOBJECT(self) || J2SOBJECT(self)->prev == J2SOBJECT(self)) {
+        return -1;
+    }
+
     // tick off from link
     J2SOBJECT(self)->prev->next = J2SOBJECT(self)->next;
     J2SOBJECT(self)->next->prev = J2SOBJECT(self)->prev;
@@ -246,6 +250,8 @@ int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self) {
     // reset link point
     J2SOBJECT(self)->next = J2SOBJECT(self);
     J2SOBJECT(self)->prev = J2SOBJECT(self);
+
+    j2sobject_free(J2SOBJECT(self));
 
     tbl->state |= J2STBL_OPBIT_DELETE;
     _j2stable_commit(tbl);

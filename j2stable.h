@@ -38,6 +38,6 @@ int j2stable_empty(struct j2stable *tbl);
 struct j2stbl_object* j2stable_query_all(struct j2stable *tbl);
 int j2stable_update(struct j2stable *tbl, struct j2stbl_object *self);
 int j2stable_delete(struct j2stable *tbl, struct j2stbl_object *self);
-// object.id will auto increase ++
+// object.__id__ will auto increase ++
 int j2stable_insert(struct j2stable *tbl, struct j2stbl_object *self);
 #endif // _J2STABLE_H_
