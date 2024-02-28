@@ -4,6 +4,8 @@ gcc -g j2s.c j2sobject.c hrserver_object.c -I. `pkg-config --cflags libcjson` `p
 
 gcc -g j2sobject.c mactbl_array.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o mactbl_array
 
+gcc -g j2sobject.c j2s_test_number_array.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o number_array
+
 # 查看运行结果
 ./j2s
 valgrind --leak-check=full ./j2s

@@ -1,0 +1,7 @@
+{
+	"intval":	100,
+	"prealloc_str":	"this is prealloc string",
+	"dynamic_str":	"this is dynamic str",
+	"intarray":	[1, 2, 3, 4, 6,8],
+	"doublearray":	[1.1, 0.2, 3.45, 40000.34, 0, 0, 0, 0, 0, 0]
+}

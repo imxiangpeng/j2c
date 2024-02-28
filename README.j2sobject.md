@@ -19,6 +19,11 @@
 
 ( 需要说明，截至目前，我们仍然不支持基础类型数组，例如 `[1,2]/["str","string"]`)
 
+PS.20240228 现在我们已经支持基本的 int/double 类型数组，我们将最后的 =offset_len= 作为数组的大小。
+
+但是这个逻辑与我们对字符串的处理一样也不一样，如果经字符串理解为字符，那么是一样的。
+
+我们如何处理字符串数组呢？
 
 ## 设计理念
 
@@ -201,7 +206,7 @@ j2sobject 对外提供 api 分为三类：
 
     // 获取结构体中 ele 元素大小
     #define _J2SOBJECT_DEMO_DATA_LEN(ele) \
-        sizeof(((struct j2sobject_demo *)0)->ele
+        sizeof(((struct j2sobject_demo *)0)->ele)
     ```
 
     **特别说明：**
