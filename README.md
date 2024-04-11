@@ -6,6 +6,9 @@ gcc -g j2sobject.c mactbl_array.c -I. `pkg-config --cflags libcjson` `pkg-config
 
 gcc -g j2sobject.c j2s_test_number_array.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o number_array
 
+gcc -g j2sobject.c j2sobject_string_array.c -I. `pkg-config --cflags libcjson` `pkg-config --libs libcjson` -o string_array
+
+
 # 查看运行结果
 ./j2s
 valgrind --leak-check=full ./j2s

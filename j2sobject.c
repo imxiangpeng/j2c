@@ -34,7 +34,6 @@
 #include "cjson/cJSON.h"
 #include "j2sobject.h"
 
-
 #define TMPFILE_TEMPLATE ".tmp_XXXXXX"
 
 // create not support none name element
@@ -98,7 +97,6 @@ static ssize_t _write_file_fd(int fd, char *data, size_t size) {
     while (left > 0) {
         ssize_t n = TEMP_FAILURE_RETRY(write(fd, ptr, left));
         if (n == -1) {
-            close(fd);
             return size - left;
         }
         ptr += n;
@@ -393,6 +391,12 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                 // do not free cJSON_Print memory, it willed be freed when object is deallocate
                 if (pt->offset_len == 0) {  // char *
                     char **ptr = (char **)((char *)self + pt->offset);
+                    // release previous memory
+                    if (*ptr) {
+                        // printf("we should release previous memory:%p\n", *ptr);
+                        free(*ptr);
+                        *ptr = NULL;
+                    }
                     *ptr = strdup(cJSON_GetStringValue(ele));
                 } else {  // char[]
                     char *ptr = (char *)((char *)self + pt->offset);
@@ -459,6 +463,12 @@ int j2sobject_deserialize_cjson(struct j2sobject *self, cJSON *jobj) {
                     // now the fields is the string array
                     cJSON_ArrayForEach(item, ele) {
                         char **ptr = (char **)((char *)self + pt->offset);
+                        // release previous memory
+                        if (*(ptr + i)) {
+                            // printf("we should release previous memory:%p\n", *(ptr + i));
+                            free(*(ptr + i));
+                            *(ptr + i) = NULL;
+                        }
                         *(ptr + i) = strdup(cJSON_GetStringValue(item));
                         i++;
                         // skip when not enough
@@ -645,7 +655,7 @@ int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target) {
                     str = ((char *)self + pt->offset);
                 }
 
-                cJSON *ele = cJSON_AddStringToObject(root, pt->name, str);
+                cJSON *ele = cJSON_AddStringToObject(root, pt->name, str ? str : "");
                 if (!ele) {
                     // failed we should release
                     return -1;
@@ -692,9 +702,15 @@ int j2sobject_serialize_cjson(struct j2sobject *self, struct cJSON *target) {
             case J2S_ARRAY | J2S_STRING: {
                 const char *const *strs = (const char *const *)((char *)self + pt->offset);
                 cJSON *array = cJSON_CreateArray();
+#if 1  // ignore null elements
                 for (unsigned int i = 0; i < pt->offset_len && strs[i] != NULL; i++) {
                     cJSON_AddItemToArray(array, cJSON_CreateString(strs[i]));
                 }
+#else  // null element not ignored!
+                for (unsigned int i = 0; i < pt->offset_len; i++) {
+                    cJSON_AddItemToArray(array, cJSON_CreateString(strs[i] ? strs[i] : ""));
+                }
+#endif
                 cJSON_AddItemToObject(root, pt->name, array);
                 break;
             }

@@ -14,8 +14,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "hr_list.h"
-#include "hrtbl_schedule.h"
+// #include "hr_list.h"
+// #include "hrtbl_schedule.h"
 #include "j2sobject.h"
 
 #define MAX_ARGS 64
@@ -44,7 +44,7 @@
         _rc;                                   \
     })
 #endif
-
+#if 0
 struct hrtbl_schedule {
     struct hrtbl_schedule_module module;
     void *dlhandle;  // dlopen handle
@@ -61,7 +61,7 @@ static struct hrtbl_schedule_priv _priv = {
     .epoll_fd = -1,
     .running = 0,
     .schedules = {&_priv.schedules, &_priv.schedules}};
-
+#endif
 // 获取元素 ele 在结构体中偏移量
 #define _J2SOBJECT_CRONTASK_DATA_OFFSET(ele) \
     offsetof(struct j2sobject_service, ele)
@@ -80,6 +80,7 @@ typedef struct j2sobject_service {
     char class[24];  // service class boot at which stage
     int disabled;    // auto startup
     int oneshot;     // auto startup
+    char* strtest;
     // action list
     // int nargs;
     char *argv[MAX_ARGS];  // max args
@@ -100,6 +101,7 @@ static struct j2sobject_fields_prototype _j2sobject_service_fields_prototype[] =
     {.name = "class", .type = J2S_STRING, .offset = _J2SOBJECT_CRONTASK_DATA_OFFSET(class), .offset_len = _J2SOBJECT_CRONTASK_DATA_ARRAY_LEN(class)},
     {.name = "disabled", .type = J2S_INT, .offset = _J2SOBJECT_CRONTASK_DATA_OFFSET(disabled), .offset_len = 0},
     {.name = "oneshot", .type = J2S_INT, .offset = _J2SOBJECT_CRONTASK_DATA_OFFSET(oneshot), .offset_len = 0},
+    {.name = "strtest", .type = J2S_STRING, .offset = _J2SOBJECT_CRONTASK_DATA_OFFSET(strtest), .offset_len = 0},
     {.name = "argv", .type = J2S_ARRAY | J2S_STRING, .offset = _J2SOBJECT_CRONTASK_DATA_OFFSET(argv), .offset_len = _J2SOBJECT_CRONTASK_DATA_ARRAY_LEN(argv) /*string buffer will dynamic allocated when needed*/},
     {0}};
 
@@ -173,7 +175,14 @@ int main(int argc, const char **argv) {
     object->intarr[0] = 6;
     object->intarr[1] = 16;
     j2sobject_serialize_file(J2SOBJECT(object), "stringarr.json");
+#if 1 // test memory leak when reload
 
+    object->strtest = strdup("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+    j2sobject_deserialize_file(J2SOBJECT(object), "stringarr.json");
+    printf("strtest:%p\n", object->strtest);
+
+    object->argv[4] = strdup("test .................");
+#endif    
     j2sobject_free(J2SOBJECT(object));
     return 0;
 }
